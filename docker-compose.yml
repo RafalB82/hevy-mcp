@@ -1,0 +1,58 @@
+services:
+
+  traefik:
+    image: traefik:v3.3
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - --api.dashboard=false
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt:/letsencrypt
+    networks:
+      - proxy
+
+  hevy-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hevy-mcp
+    restart: unless-stopped
+    environment:
+      HEVY_API_KEY: ${HEVY_API_KEY}
+      PORT: 3000
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.hevy-mcp.rule=Host(`${MCP_DOMAIN}`)
+      - traefik.http.routers.hevy-mcp.entrypoints=websecure
+      - traefik.http.routers.hevy-mcp.tls.certresolver=letsencrypt
+      - traefik.http.services.hevy-mcp.loadbalancer.server.port=3000
+      # Middleware: basic auth (opcjonalne, odkomentuj i ustaw BASIC_AUTH w .env)
+      # - traefik.http.routers.hevy-mcp.middlewares=hevy-auth
+      # - traefik.http.middlewares.hevy-auth.basicauth.users=${BASIC_AUTH}
+    networks:
+      - proxy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  letsencrypt:
+
+networks:
+  proxy:
+    external: false
