@@ -1,23 +1,31 @@
 # syntax=docker/dockerfile:1
 
-# ── Stage 1: build ──────────────────────────────────────────────────────────
+# ── Stage 1: build ───────────────────────────────────────────────────────────
 FROM node:24-alpine AS builder
 WORKDIR /app
 
-COPY package.json package-lock.json .npmrc ./
-RUN npm ci --ignore-scripts
+# Aktywuj pnpm przez wbudowany corepack (Node 24)
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+COPY package.json pnpm-lock.yaml* ./
+# Jesli nie ma pnpm-lock.yaml, pnpm zaimportuje z package-lock.json
+RUN [ -f pnpm-lock.yaml ] || pnpm import
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 COPY . .
-RUN npm run build
+RUN pnpm run build
 
-# ── Stage 2: runtime ────────────────────────────────────────────────────────
+# ── Stage 2: runtime ─────────────────────────────────────────────────────────
 FROM node:24-alpine AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-COPY package.json package-lock.json .npmrc ./
-RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+COPY package.json pnpm-lock.yaml* ./
+RUN [ -f pnpm-lock.yaml ] || pnpm import
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts && pnpm store prune
 
 COPY --from=builder /app/dist ./dist
 
