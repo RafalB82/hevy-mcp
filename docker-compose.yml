@@ -1,29 +1,5 @@
 services:
 
-  traefik:
-    image: traefik:v3.3
-    container_name: traefik
-    restart: unless-stopped
-    command:
-      - --api.dashboard=false
-      - --providers.docker=true
-      - --providers.docker.exposedbydefault=false
-      - --entrypoints.web.address=:80
-      - --entrypoints.web.http.redirections.entrypoint.to=websecure
-      - --entrypoints.web.http.redirections.entrypoint.scheme=https
-      - --entrypoints.websecure.address=:443
-      - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
-      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}
-      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - letsencrypt:/letsencrypt
-    networks:
-      - proxy
-
   hevy-mcp:
     build:
       context: .
@@ -43,16 +19,13 @@ services:
       # - traefik.http.routers.hevy-mcp.middlewares=hevy-auth
       # - traefik.http.middlewares.hevy-auth.basicauth.users=${BASIC_AUTH}
     networks:
-      - proxy
+      - hevy_network
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
       interval: 30s
       timeout: 5s
       retries: 3
 
-volumes:
-  letsencrypt:
-
 networks:
-  proxy:
-    external: false
+  hevy_network:
+    external: true
