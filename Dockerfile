@@ -4,11 +4,9 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
 
-# Aktywuj pnpm przez wbudowany corepack (Node 24)
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY package.json pnpm-lock.yaml* ./
-# Jesli nie ma pnpm-lock.yaml, pnpm zaimportuje z package-lock.json
+COPY package.json package-lock.json* pnpm-lock.yaml* ./
 RUN [ -f pnpm-lock.yaml ] || pnpm import
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
@@ -23,7 +21,7 @@ ENV NODE_ENV=production
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY package.json pnpm-lock.yaml* ./
+COPY package.json package-lock.json* pnpm-lock.yaml* ./
 RUN [ -f pnpm-lock.yaml ] || pnpm import
 RUN pnpm install --frozen-lockfile --prod --ignore-scripts && pnpm store prune
 
